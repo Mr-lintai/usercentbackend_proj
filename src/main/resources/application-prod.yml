@@ -1,0 +1,11 @@
+spring:
+  #Data source
+  datasource:
+    driver-class-name: com.mysql.jdbc.Driver
+    url: jdbc:mysql://47.116.53.60:3306/usercent?useUnicode=true&characterEncoding=utf-8&serverTimezone=GMT%2B8&useSSL=false
+    username: dogyupi
+    password: yupi666
+  #session失效时间
+  session:
+    timeout: 86400
+
