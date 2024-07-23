@@ -77,6 +77,5 @@ class UserServiceTest {
         //Assertions.assertTrue(result>0);
         Assertions.assertEquals(-1, result);
 
-
     }
 }

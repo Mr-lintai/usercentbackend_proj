@@ -1,9 +1,12 @@
 package com.yupi.usercent.service;
 
+import com.yupi.usercent.common.BaseResponse;
+import com.yupi.usercent.model.VO.UserVO;
 import com.yupi.usercent.model.domain.User;
 import com.baomidou.mybatisplus.extension.service.IService;
 
 import javax.servlet.http.HttpServletRequest;
+import java.util.List;
 
 /**
  * @author lintai
@@ -34,4 +37,27 @@ public interface UserService extends IService<User> {
     User getSafetyUser(User originUser);
 
     int userLogout(HttpServletRequest request);
+
+    List<User> searchUsersByTags(List<String> tagNameList);
+
+    int updateUser(User user, User loginUser);
+
+    /**
+     * 获取当前用户信息
+     * @return
+     */
+    User getLoginUser(HttpServletRequest request);
+
+    boolean isAdmin(HttpServletRequest request);
+
+    boolean isAdmin(User loginUser);
+
+
+    /**
+     * 匹配用户
+     * @param num
+     * @param loginUser
+     * @return
+     */
+    List<User> matchUser(long num, User loginUser);
 }

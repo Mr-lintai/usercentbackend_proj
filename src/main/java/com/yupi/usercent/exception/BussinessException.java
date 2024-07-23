@@ -20,15 +20,21 @@ public class BussinessException extends RuntimeException {
         this.description = description;
     }
 
+    public BussinessException(ErrorCode errorCode, String description) {
+        super(errorCode.getMessage());
+        this.code = errorCode.getCode();
+        this.description = description;
+    }
+
     public BussinessException(ErrorCode errorCode) {
         super(errorCode.getMessage());
         this.code = errorCode.getCode();
         this.description = errorCode.getDescription();
     }
 
-    public BussinessException(ErrorCode errorCode, String message) {
-        super(message);
-        this.code = errorCode.getCode();
-        this.description = errorCode.getDescription();
-    }
+//    public BussinessException(ErrorCode errorCode, String message) {
+//        super(message);
+//        this.code = errorCode.getCode();
+//        this.description = errorCode.getDescription();
+//    }
 }

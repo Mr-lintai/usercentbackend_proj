@@ -1,4 +1,4 @@
-package com.yupi.usercent.model.domain;
+package com.yupi.usercent.model.VO;
 
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
@@ -7,16 +7,16 @@ import java.io.Serializable;
 import java.util.Date;
 
 /**
- * 用户
- * @TableName user
+ * 用户包装类（脱敏）
+ * @author lintai
+ * @version 1.0
  */
-@TableName(value ="user")
 @Data
-public class User implements Serializable {
+public class UserVO implements Serializable{
+
     /**
      *用户id
      */
-    @TableId(type = IdType.AUTO)
     private long id;
 
     /**
@@ -38,11 +38,6 @@ public class User implements Serializable {
      * 性别
      */
     private Integer gender;
-
-    /**
-     * 密码
-     */
-    private String userPassword;
 
     /**
      * 电话
@@ -70,12 +65,6 @@ public class User implements Serializable {
     private Date updateTime;
 
     /**
-     * 是否被删除
-     */
-    @TableLogic
-    private Integer isDelete;
-
-    /**
      * 0-普通用户 1-管理员 2
      */
     private Integer userRole;
@@ -90,7 +79,5 @@ public class User implements Serializable {
      */
     private String tags;
 
-    @TableField(exist = false)
     private static final long serialVersionUID = 1L;
-
 }

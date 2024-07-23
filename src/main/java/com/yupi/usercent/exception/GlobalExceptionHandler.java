@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 /**
  * 全局异常处理器
  */
+//aop在执行代码前后进行封装
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
@@ -23,11 +24,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BussinessException.class)
     public BaseResponse bussinessExceptionHandler(BussinessException e) {
         log.error("bussinessException"+ e.getMessage(), e);
-        return ResultUtils.error(e.getCode(),e.getMessage(), e.getMessage());
+        return ResultUtils.error(e.getCode(),e.getMessage(), e.getDescription());
     }
 
     @ExceptionHandler(RuntimeException.class)
-    public BaseResponse runtimeExceptionHandler(BussinessException e) {
+    public BaseResponse runtimeExceptionHandler(RuntimeException e) {
         log.error("runtimeException", e);
         return ResultUtils.error(ErrorCode.SYSTEM_ERROR, e.getMessage(), "");
     }

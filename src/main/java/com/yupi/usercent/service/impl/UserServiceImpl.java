@@ -2,21 +2,30 @@ package com.yupi.usercent.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+import com.yupi.usercent.common.BaseResponse;
 import com.yupi.usercent.common.ErrorCode;
 import com.yupi.usercent.exception.BussinessException;
+import com.yupi.usercent.model.VO.UserVO;
 import com.yupi.usercent.model.domain.User;
 import com.yupi.usercent.service.UserService;
 import com.yupi.usercent.mapper.UserMapper;
+import com.yupi.usercent.utils.AlgorithmUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
 import org.springframework.util.DigestUtils;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
+import static com.yupi.usercent.constant.UserConstant.ADMIN_ROLE;
 import static com.yupi.usercent.constant.UserConstant.USER_LOGIN_STATE;
 
 /**
@@ -136,6 +145,74 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         return safetyUser;
     }
 
+    @Deprecated
+    private List<User> searchUsersByTagsBySQL(List<String> tagNameList){
+        if(CollectionUtils.isEmpty(tagNameList)){
+            throw new BussinessException(ErrorCode.PARAMS_ERROR);
+        }
+        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
+        // 拼接 and 查询
+        //like ‘%java’ and like '%Python'
+        for(String tagName : tagNameList){
+            queryWrapper = queryWrapper.like("tags", tagName);
+        }
+        List<User> userList = userMapper.selectList(queryWrapper);
+        return userList.stream().map(this::getSafetyUser).collect(Collectors.toList());
+    }
+
+    public List<User> searchUsersByTags(List<String> tagNameList){
+        //1、先查询所有用户
+        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
+        List<User> userList = userMapper.selectList(queryWrapper);
+        Gson gson = new Gson();
+        //2、在内存中判断是否有包含要求的标签
+        return userList.stream().filter(user->{
+            String tagsStr = user.getTags();
+            if(StringUtils.isNotBlank(tagsStr)){
+                return false;
+            }
+            Set<String> tempTagNameSet = gson.fromJson(tagsStr, new TypeToken<Set<String>>(){}.getType());
+            for(String tagName : tagNameList){
+                if(!tempTagNameSet.contains(tagName)){
+                    return false;
+                }
+            }
+            return true;
+        }).map(this::getSafetyUser).collect(Collectors.toList());
+    }
+
+    @Override
+    public int updateUser(User user, User loginUser) {
+        long userId = user.getId();
+        if(userId <= 0){
+            throw new BussinessException(ErrorCode.PARAMS_ERROR);
+        }
+        //todo 补充校验，如果用户没有传任何要更新的值，就直接报错，不用执行更新语句
+        //仅管理员和自己可修改
+        //如果是管理员，允许更新任意用户
+        //如果不是管理员，仅允许更新自己当前信息
+        if(isAdmin(loginUser) && userId != loginUser.getId()){
+            throw new BussinessException(ErrorCode.NO_AUTH);
+        }
+        User oldUser = userMapper.selectById(userId);
+        if(oldUser == null){
+            throw new BussinessException(ErrorCode.NULL_ERROR);
+        }
+        return userMapper.updateById(user);//i为受影响行数
+    }
+
+    @Override
+    public User getLoginUser(HttpServletRequest request) {
+        if(request == null){
+            return null;
+        }
+        Object userObj = request.getSession().getAttribute(USER_LOGIN_STATE);
+        if(userObj == null){
+            throw new BussinessException(ErrorCode.NO_AUTH);
+        }
+        return (User)userObj;
+    }
+
     /**
      * 用户脱敏
      * @param originUser
@@ -156,6 +233,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         safetyUser.setUserStatus(0);
         safetyUser.setCreateTime(originUser.getCreateTime());
         safetyUser.setUserRole(originUser.getUserRole());
+        safetyUser.setTags(originUser.getTags());
         //更新时间不返回
         //是否被删除与业务无关，不返回
         return safetyUser;
@@ -167,6 +245,55 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         request.getSession().removeAttribute(USER_LOGIN_STATE);
         return 1;
     }
+
+    /**
+     * 是否为管理员
+     *
+     * @param request
+     * @return
+     */
+    public boolean isAdmin(HttpServletRequest request) {
+        //仅管理员可操作
+        Object userObj = request.getSession().getAttribute(USER_LOGIN_STATE);
+        User user = (User) userObj;
+        return user != null && user.getUserRole() == ADMIN_ROLE;
+    }
+
+    public boolean isAdmin(User loginUser) {
+        //仅管理员可操作
+        return loginUser != null && loginUser.getUserRole() == ADMIN_ROLE;
+    }
+
+    @Override
+    public List<User> matchUser(long num, User loginUser) {
+        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
+        queryWrapper.select("id", "select");
+        queryWrapper.isNotNull("tag");
+        List<User> userList = this.list();
+        String tags = loginUser.getTags();
+        Gson gson = new Gson();
+        List<String> tagList = gson.fromJson(tags, new TypeToken<List<String>>(){}.getType());
+        //用户列表的下标=》相似度
+        SortedMap<Integer, Long> indexDistanceMap = new TreeMap<>(Comparator.comparing(a->a));
+        for (int i = 0; i < userList.size(); i++) {
+            User user = userList.get(i);
+            String userTags = user.getTags();
+            //无标签
+            if(StringUtils.isBlank(userTags)){
+                continue;
+            }
+            List<String> userTagList = gson.fromJson(userTags, new TypeToken<List<String>>(){}.getType());
+            //计算分数
+            long distance = AlgorithmUtils.editDistance(tagList, userTagList);
+            indexDistanceMap.put(i, distance);
+        }
+        List<Integer> maxDistanceIndexList = indexDistanceMap.keySet().stream().limit(num).collect(Collectors.toList());
+        List<User> userVOList = maxDistanceIndexList.stream()
+                .map(index-> getSafetyUser(userList.get(index)))
+                .collect(Collectors.toList());
+        return userVOList;
+    }
+
 }
 
 
